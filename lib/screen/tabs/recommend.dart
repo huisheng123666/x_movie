@@ -1,7 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:x_movie/constants.dart';
 import 'package:x_movie/screen/video_play.dart';
 import 'package:x_movie/util.dart';
+
+const statusBarStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.white,
+  statusBarIconBrightness: Brightness.dark,
+);
 
 class Recommend extends StatefulWidget {
   const Recommend({super.key});
@@ -15,6 +22,8 @@ class Recommend extends StatefulWidget {
 class _Recommend extends State<Recommend> {
   @override
   Widget build(BuildContext context) {
+    Util.setStatusBarTextColor(statusBarStyle);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -53,7 +62,12 @@ class RecommendItem extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         Navigator.of(context)
-            .push(MaterialPageRoute(builder: (context) => VideoPaly()));
+            .push(MaterialPageRoute(builder: (context) => VideoPaly()))
+            .then((value) {
+          Timer(const Duration(milliseconds: 300), () {
+            Util.setStatusBarTextColor(statusBarStyle);
+          });
+        });
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 10),
