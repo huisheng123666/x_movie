@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:x_movie/screen/tabs_page.dart';
+import 'package:x_movie/util.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,6 +12,8 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    Util.initDio();
+
     return MaterialApp(
       title: 'Flutter Demo',
       debugShowCheckedModeBanner: false,
