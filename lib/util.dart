@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:toast/toast.dart';
 
 double mediaWidth = 0;
 
@@ -32,9 +33,11 @@ class Util {
     return MediaQuery.of(context).padding.bottom;
   }
 
-  static initDio() {
+  static initDio(BuildContext context) {
+    ToastContext().init(context);
+
     Util.dio.options = BaseOptions(
-      baseUrl: 'http://192.168.28.17:4000/api',
+      baseUrl: 'http://192.168.28.15:4000/api',
       connectTimeout: 5000,
       receiveTimeout: 3000,
     );
@@ -46,13 +49,16 @@ class Util {
           return handler.next(Response(
               requestOptions: response.requestOptions, data: response.data));
         } else {
-          return handler.resolve(response);
+          Toast.show(response.data['msg'], gravity: Toast.center);
+          return handler.reject(DioError(
+              requestOptions: response.requestOptions,
+              response: response.data));
         }
       },
       onError: (e, handler) {
-        return handler.resolve(Response(
-            requestOptions: e.requestOptions,
-            data: <String, String>{'msg': '网络错误，请稍后再试'}));
+        Toast.show('网络错误，请稍后再试', gravity: Toast.center);
+        // return handler.reject(
+        //     DioError(requestOptions: e.requestOptions, response: e.response));
       },
     ));
   }

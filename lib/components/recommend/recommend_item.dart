@@ -4,14 +4,14 @@ import 'package:x_movie/util.dart';
 
 class RecommendItem extends StatelessWidget {
   final Movie movie;
-  final VoidCallback onTab;
+  final VoidCallback? onTab;
 
   const RecommendItem({super.key, required this.movie, required this.onTab});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTab,
+      onTap: onTab ?? (() {}),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Column(

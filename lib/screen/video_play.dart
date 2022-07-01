@@ -2,11 +2,15 @@ import 'package:flick_video_player/flick_video_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:x_movie/components/video_play/comment_wrap.dart';
+import 'package:x_movie/components/video_play/video_intro.dart';
 import 'package:x_movie/constants.dart';
+import 'package:x_movie/models/movie.dart';
 import 'package:x_movie/util.dart';
 
 class VideoPaly extends StatefulWidget {
-  const VideoPaly({super.key});
+  final Movie movie;
+  const VideoPaly({super.key, required this.movie});
 
   @override
   State<StatefulWidget> createState() {
@@ -16,7 +20,13 @@ class VideoPaly extends StatefulWidget {
 
 class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
   late FlickManager flickManager;
+  late FlickShowControlsAction flickShowControlsAction;
   late TabController tabController;
+  bool showSep = false;
+  String currenturl = '';
+
+  late AnimationController animationController;
+  late Animation<double> animation;
 
   @override
   void initState() {
@@ -25,10 +35,26 @@ class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
     flickManager = FlickManager(
       autoPlay: false,
       videoPlayerController: VideoPlayerController.network(
-        'https://dy2.yle888.vip/20220623/auUqoqRk/index.m3u8',
+        widget.movie.playUrls[0],
         formatHint: VideoFormat.hls,
       ),
     );
+
+    setState(() {
+      currenturl = widget.movie.playUrls[0];
+    });
+    animationController = AnimationController(
+        duration: const Duration(milliseconds: 300), vsync: this);
+
+    CurvedAnimation curve =
+        CurvedAnimation(parent: animationController, curve: Curves.ease);
+
+    animation = Tween(begin: 60.0, end: 0.0).animate(curve)
+      ..addListener(() {
+        setState(() {
+          // the state that has changed here is the animation object’s value
+        });
+      });
 
     tabController = TabController(length: 2, vsync: this);
   }
@@ -36,7 +62,18 @@ class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
   @override
   void dispose() {
     flickManager.dispose();
+    animationController.dispose();
     super.dispose();
+  }
+
+  void _switchPlay(String url) {
+    flickManager.handleChangeVideo(VideoPlayerController.network(
+      url,
+      formatHint: VideoFormat.hls,
+    ));
+    setState(() {
+      currenturl = url;
+    });
   }
 
   @override
@@ -65,22 +102,86 @@ class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
                   color: Colors.black87,
                   child: FlickVideoPlayer(
                     flickManager: flickManager,
+                    wakelockEnabledFullscreen: true,
                   ),
                 ),
                 Positioned(
-                  left: 20,
-                  top: 20,
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Icon(
-                      Icons.arrow_back_ios,
-                      color: Colors.white,
-                      size: 20,
+                  left: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    width: Util.screenWidth(context),
+                    height: 50,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0, 1],
+                        colors: [
+                          Color.fromRGBO(0, 0, 0, 0.12),
+                          Color.fromRGBO(0, 0, 0, 0)
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Icon(
+                            Icons.arrow_back_ios,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        widget.movie.playUrls.length > 1
+                            ? GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    showSep = true;
+                                    animationController.forward();
+                                  });
+                                },
+                                child: Container(
+                                  width: 40,
+                                  height: 20,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                      border: Border.all(
+                                          width: 1, color: xPrimaryColor)),
+                                  child: const Text(
+                                    '选集',
+                                    style: TextStyle(
+                                        color: xPrimaryColor, fontSize: 12),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox(),
+                      ],
                     ),
                   ),
                 ),
+                Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Transform.translate(
+                      offset: Offset(animation.value, 0),
+                      child: Episode(
+                        playUrls: widget.movie.playUrls,
+                        switchPlay: _switchPlay,
+                        currenUrl: currenturl,
+                        close: () {
+                          setState(() {
+                            showSep = false;
+                            animationController.reverse();
+                          });
+                        },
+                      ),
+                    )),
                 Positioned(
                   left: 0,
                   bottom: 0,
@@ -115,7 +216,7 @@ class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
             Expanded(
                 child: TabBarView(
               controller: tabController,
-              children: [const VideoIntro(), CommentWrap()],
+              children: [VideoIntro(movie: widget.movie), CommentWrap()],
             ))
           ],
         ),
@@ -124,261 +225,60 @@ class _VideoPlay extends State<VideoPaly> with TickerProviderStateMixin {
   }
 }
 
-class CommentWrap extends StatelessWidget {
-  const CommentWrap({
-    Key? key,
-  }) : super(key: key);
+class Episode extends StatelessWidget {
+  final List<String> playUrls;
+  final void Function(String url) switchPlay;
+  final VoidCallback close;
+  final String currenUrl;
 
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ListView.builder(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 15,
-            bottom: Util.bottomSafeHeight(context) + 60,
-          ),
-          itemBuilder: (context, index) => const Comment(),
-          itemCount: 10,
-        ),
-        Positioned(
-          left: 0,
-          bottom: 0,
-          child: Container(
-            alignment: Alignment.topCenter,
-            height: Util.bottomSafeHeight(context) + 60,
-            width: Util.screenWidth(context),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                top: BorderSide(
-                  width: 1,
-                  color: Color.fromRGBO(0, 0, 0, 0.08),
-                ),
-              ),
-            ),
-            child: Container(
-              height: 40,
-              alignment: Alignment.center,
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              margin: EdgeInsets.only(top: 10),
-              decoration: BoxDecoration(
-                  color: Color.fromRGBO(0, 0, 0, 0.05),
-                  borderRadius: BorderRadius.circular(5)),
-              child: const TextField(
-                keyboardType: TextInputType.text,
-                textInputAction: TextInputAction.done,
-                cursorColor: Colors.black,
-                decoration: InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    hintText: '请输入评论',
-                    hintStyle: TextStyle(color: Color(0xff999999))),
-              ),
-            ),
-          ),
-        )
-      ],
-    );
-  }
-}
-
-class Comment extends StatelessWidget {
-  const Comment({
-    Key? key,
-  }) : super(key: key);
+  const Episode({
+    super.key,
+    required this.playUrls,
+    required this.switchPlay,
+    required this.close,
+    required this.currenUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      height: Util.screenWidth(context) * 9 / 16 - 4,
+      width: 60,
+      decoration: BoxDecoration(
+        color: Colors.black,
+        border: Border.all(width: 1, color: Colors.white30),
+      ),
+      child: Column(
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              image: const DecorationImage(
-                image: NetworkImage(
-                  'https://img1.baidu.com/it/u=2625325923,3446322967&fm=253&fmt=auto&app=120&f=JPEG?w=800&h=800',
-                ),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  '回声',
-                  style: TextStyle(
-                    color: Color(0xff282828),
-                    fontSize: 14,
-                    height: 1.1,
-                    fontWeight: FontWeight.w500,
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              itemCount: playUrls.length,
+              itemBuilder: (context, index) => GestureDetector(
+                onTap: () {
+                  switchPlay(playUrls[index]);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Text(
+                    '第${index + 1}集',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: currenUrl == playUrls[index]
+                          ? xPrimaryColor
+                          : Colors.white54,
+                    ),
                   ),
                 ),
-                SizedBox(height: 8),
-                Text(
-                  '请问你的配图都是怎么找的呀有没有相关网站推荐一下',
-                  style: TextStyle(
-                    color: Color(0xff6a6a6a),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  '2022-06-29',
-                  style: TextStyle(
-                    color: Color(0xffc2c2c2),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
           GestureDetector(
-              onTap: () {},
-              child: Column(
-                children: const [
-                  SizedBox(height: 10),
-                  Icon(
-                    Icons.favorite,
-                    color: xPrimaryColor,
-                    size: 20,
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    '200',
-                    style: TextStyle(color: Colors.black54, fontSize: 12),
-                  )
-                ],
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-class VideoIntro extends StatelessWidget {
-  const VideoIntro({
-    Key? key,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 15),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Text(
-              '星际穿越',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 30,
-                height: 1.4,
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Text(
-              '分类：科幻 · 语言：英语 · 导演：克里斯托弗·诺兰',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xffa5a5a5), height: 1.6),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              GestureDetector(
-                onTap: () {},
-                child: const Icon(
-                  Icons.message,
-                  color: Color(0xffcfcfcf),
-                  size: 35,
-                ),
-              ),
-              const SizedBox(width: 50),
-              GestureDetector(
-                onTap: () {},
-                child: const Icon(
-                  Icons.favorite,
-                  color: xPrimaryColor,
-                  size: 35,
-                ),
-              ),
-              const SizedBox(width: 50),
-              GestureDetector(
-                onTap: () {},
-                child: const Icon(
-                  Icons.share,
-                  color: Color(0xffcfcfcf),
-                  size: 35,
-                ),
-              ),
-            ],
-          ),
-          Container(
-            margin: EdgeInsets.only(top: 20, bottom: 15),
-            height: 10,
-            color: const Color(0xfff6f6f6),
-          ),
-          const Text(
-            'INTRODUCE',
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 20,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 15),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '《星际穿越》是2014年美英联合制作的科幻电影。该片由克里斯托弗·诺兰执导，马修·麦康纳、安妮·海瑟薇领衔主演。该片在物理学家基普·索恩的黑洞理论之上进行改编，主要讲述了一组宇航员通过穿越虫洞来为人类寻找新家园的冒险故事。该片于2014年11月5日在美国公映，11月7日在英国公映，11月12日在中国大陆公映。并于2020年8月2日在中国大陆重映。',
-              style: TextStyle(
-                color: Colors.black87,
-                height: 1.8,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'ACTOR',
-            style: TextStyle(
-              color: Colors.black87,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '北野武,国舞亚矢,渡边哲,胜村政信,寺岛进,大杉涟,森下能幸,津田宽治,木下邦家,克里斯·布里顿,水森コウ太,逗子とんぼ,矢岛健一',
-              style: TextStyle(
-                color: Colors.black87,
-                height: 1.6,
-                fontSize: 14,
-              ),
+            onTap: close,
+            child: const Icon(
+              Icons.close,
+              color: Colors.white,
+              size: 20,
             ),
           ),
         ],
@@ -386,3 +286,44 @@ class VideoIntro extends StatelessWidget {
     );
   }
 }
+
+// class VideoPaly extends StatefulWidget {
+//   const VideoPaly({super.key});
+
+//   @override
+//   _VideoPaly createState() => _VideoPaly();
+// }
+
+// class _VideoPaly extends State<VideoPaly> with SingleTickerProviderStateMixin {
+//   late Animation<double> animation;
+//   late AnimationController controller;
+
+//   initState() {
+//     super.initState();
+//     controller = new AnimationController(
+//         duration: const Duration(milliseconds: 2000), vsync: this);
+//     animation = new Tween(begin: 0.0, end: 300.0).animate(controller)
+//       ..addListener(() {
+//         setState(() {
+//           // the state that has changed here is the animation object’s value
+//         });
+//       });
+//     controller.forward();
+//   }
+
+//   Widget build(BuildContext context) {
+//     return new Center(
+//       child: new Container(
+//         margin: new EdgeInsets.symmetric(vertical: 10.0),
+//         height: animation.value,
+//         width: animation.value,
+//         child: new FlutterLogo(),
+//       ),
+//     );
+//   }
+
+//   dispose() {
+//     controller.dispose();
+//     super.dispose();
+//   }
+// }

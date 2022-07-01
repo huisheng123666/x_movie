@@ -1,7 +1,7 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:toast/toast.dart';
 import 'package:x_movie/components/recommend/recommend_item.dart';
 import 'package:x_movie/models/movie.dart';
 import 'package:x_movie/screen/video_play.dart';
@@ -28,6 +28,12 @@ class _Recommend extends State<Recommend> {
   void initState() {
     super.initState();
     Util.dio.get('/movie/recommend').then((res) {
+      if (res.data['msg'] != '') {
+        Toast.show(
+          res.data['msg'],
+        );
+        return;
+      }
       List<Movie> moviesTem = [];
       for (var i = 0; i < res.data['data'].length; i++) {
         moviesTem.add(Movie.formatJson(res.data['data'][i]));
@@ -40,8 +46,9 @@ class _Recommend extends State<Recommend> {
 
   @override
   Widget build(BuildContext context) {
-    Util.setStatusBarTextColor(statusBarStyle);
+    ToastContext().init(context);
 
+    Util.setStatusBarTextColor(statusBarStyle);
     return Scaffold(
       backgroundColor: const Color(0xfff6f6f6),
       appBar: AppBar(
@@ -70,7 +77,11 @@ class _Recommend extends State<Recommend> {
           movie: movies[index],
           onTab: () {
             Navigator.of(context)
-                .push(MaterialPageRoute(builder: (context) => VideoPaly()))
+                .push(
+              MaterialPageRoute(
+                builder: (context) => VideoPaly(movie: movies[index]),
+              ),
+            )
                 .then((value) {
               Timer(const Duration(milliseconds: 300), () {
                 Util.setStatusBarTextColor(statusBarStyle);
